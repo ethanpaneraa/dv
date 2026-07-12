@@ -176,8 +176,9 @@ fn event_loop(
                                         KeyCode::Char('n') | KeyCode::Tab | KeyCode::Right => {
                                             app.next_file()
                                         }
-                                        KeyCode::Char('p') | KeyCode::BackTab => app.prev_file(),
-                                        KeyCode::Left => app.go_home(),
+                                        KeyCode::Char('p') | KeyCode::BackTab | KeyCode::Left => {
+                                            app.prev_file()
+                                        }
                                         KeyCode::Char('g') => app.scroll = 0,
                                         _ => {}
                                     }

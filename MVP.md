@@ -103,12 +103,16 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
   against regressions.
 - **`rust-toolchain.toml` pinned** to 1.97.0, so a future clone doesn't hit the same
   `edition2024`/Cargo-1.83 wall we hit at project start.
-- **Arrow-key drill-in/out on Home** — `Right`/`Enter` on a highlighted project opens
-  it into the Diff view (file-manager style: a project "contains" its diff); `Left`
-  from the Diff view returns to Home. This took over `Left` in the Diff view, which
-  previously meant "previous file" — that's now `p`/Shift-Tab only, freeing `Left` for
-  the drill-out semantics. `Right`/`Tab`/`n` are unchanged (still "next file") since
-  there's nothing further right to drill into once you're already in the Diff view.
+- **Arrow-key drill-in on Home** — `Right`/`Enter` on a highlighted project opens it
+  into the Diff view. This originally also repurposed `Left` in the Diff view to mean
+  "back to Home" (drill-out), which broke the far more basic expectation that
+  `Left`/`Right` mirror each other for file navigation the same way `n`/`p` do:
+  `Right` moved to the next file but `Left` jumped out to Home instead of the previous
+  file, reported as "I can't switch between files anymore." Reverted — `Left` is
+  `prev_file` again, matching `Right`/`next_file`. Home is reached the same way it
+  always was, double-tap `Space`, which needed no drill-out shortcut in the first
+  place. Lesson: a new binding that breaks symmetry with an existing one is a strong
+  smell, even if each half seems reasonable on its own.
 - **Fixed: files scrolling out of view looked broken** — the Files sidebar and
   Projects list rebuilt a fresh `ListState::default()` on every single frame, so
   ratatui had no memory of where the viewport was scrolled to. The moment the

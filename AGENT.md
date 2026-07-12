@@ -72,6 +72,16 @@ fixing a real conflict. Don't add one speculatively; if a genuine conflict shows
 (e.g. Files needs independent arrow-key navigation), that's when a real `Focus` enum
 earns its complexity.
 
+**`Left`/`Right` in the Diff view must stay symmetric with `n`/`p`.** They briefly
+weren't: `Right` meant "next file" but `Left` was repurposed to mean "back to Home"
+(drill-out), which shipped as `Right`/`Enter` on Home opening a project (drill-in) —
+each half seemed reasonable alone, but breaking the Left/Right mirror read as "file
+navigation stopped working," not as "there's a new Home shortcut." Reverted: `Left` is
+`prev_file`, matching `Right`/`next_file`, same as `p`/`n`. Home is reached by
+double-tap `Space` only — it never needed a drill-out shortcut. If arrow-key
+drill-in/out gets revisited, keep both directions inside the same screen (or don't do
+it at all) rather than splitting one direction across screens.
+
 **There is no bare-key project switch from the Diff view, and don't re-add one.**
 `{`/`}` used to cycle projects directly without going through Home. It caused two
 separate real confusions: first, "these keys don't do anything" (correctly a no-op
