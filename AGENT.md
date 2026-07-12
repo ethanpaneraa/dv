@@ -25,8 +25,9 @@ repo. See [MVP.md](MVP.md) for product scope.
 - `src/app.rs` — app state (`App` holding `Vec<ProjectView>` plus a `Screen` enum:
   `Home` or `Diff`). Rendering (syntax highlighting) is **lazy**: `ProjectView.rendered`
   is `Option<Vec<Vec<Line>>>`, populated by `ensure_rendered()` the first time a project
-  is actually opened (`home_confirm`/`next_project`/`prev_project`), not at load time —
-  Home never needs it. `App.highlighter: Option<Highlighter>` is lazy for the same
+  is actually opened (`home_confirm`, the only way to switch projects now — see the
+  `{`/`}` note below), not at load time — Home never needs it. `App.highlighter:
+  Option<Highlighter>` is lazy for the same
   reason: constructing it loads `syntect`'s default syntax/theme sets, which isn't free.
   Home-screen nav state (`query`/`matches`/`matched_selected`) and its type/backspace/
   move/confirm methods; `go_home()` returns to it from `Diff`. `apply_watch_update()`
@@ -70,6 +71,19 @@ the two key sets were never actually ambiguous, so a toggle would add a mode wit
 fixing a real conflict. Don't add one speculatively; if a genuine conflict shows up
 (e.g. Files needs independent arrow-key navigation), that's when a real `Focus` enum
 earns its complexity.
+
+**There is no bare-key project switch from the Diff view, and don't re-add one.**
+`{`/`}` used to cycle projects directly without going through Home. It caused two
+separate real confusions: first, "these keys don't do anything" (correctly a no-op
+with one project loaded, but indistinguishable from broken), then worse, "my files
+disappeared" (with multiple projects loaded, it silently swapped the entire Files
+list to a different project's with no visual cue a switch happened). Removed
+entirely rather than patched with a visual indicator — two confusing incidents from
+one feature was enough signal it wasn't earning its complexity. The only way to
+switch projects now is `go_home()` (double-tap Space) → pick explicitly on the full
+Home screen, where you can see what you're choosing before committing. If a quick
+in-place switcher gets re-requested, that's a product decision to raise with the
+user, not something to quietly rebuild.
 
 **Watch mode is polling, not filesystem events, on purpose.** `notify` (or similar)
 would react instantly instead of within a 2s window, but `std::thread` + a plain

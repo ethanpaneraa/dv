@@ -51,8 +51,8 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
   (an ASCII logo, a fuzzy-filterable project list, a footer) regardless of how many
   projects were found — including exactly one, for consistency — and Enter opens the
   selected project into Files + Diff. Double-tapping Space from within a project returns
-  to Home (full-page, not an overlay); `{`/`}` still cycle projects directly without
-  leaving the diff. Only `dv <path>` (an explicit path) skips Home, for scripting.
+  to Home (full-page, not an overlay). Only `dv <path>` (an explicit path) skips Home,
+  for scripting.
 - **Startup performance** — measured with a 5-repo, ~600-changed-line-per-repo stress
   test (`time dv`, first draw to first keypress): 1.26s → 0.44s. Two fixes, found by
   instrumenting `main`/`App::new` with real timers rather than guessing:
@@ -124,6 +124,14 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
   *projects* — with only one project loaded they're correctly no-ops, which read as
   "these keys don't do anything" rather than "there's nothing to switch to." Footer
   now always shows `n/p: file`.
+- **Removed `{`/`}` project-switching entirely** — even after the footer hint fix
+  above, this caused a second, worse confusion: with multiple projects loaded,
+  pressing `}` silently swapped the *entire* Files list to a different project with no
+  visual cue that a switch had happened, which read as "my files just vanished" rather
+  than "I switched context." Two confusing incidents from the same feature was enough
+  to conclude it wasn't earning its complexity. The only way to switch projects now is
+  double-tap `Space` → Home screen → pick one explicitly — deliberate, and it shows you
+  exactly what you're picking before you commit to it.
 
 ## Roadmap (next, in priority order)
 

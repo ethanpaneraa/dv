@@ -155,24 +155,6 @@ impl App {
         }
     }
 
-    pub fn next_project(&mut self) {
-        if self.selected_project + 1 < self.projects.len() {
-            self.selected_project += 1;
-            self.selected_file = 0;
-            self.scroll = 0;
-            self.ensure_rendered(self.selected_project);
-        }
-    }
-
-    pub fn prev_project(&mut self) {
-        if self.selected_project > 0 {
-            self.selected_project -= 1;
-            self.selected_file = 0;
-            self.scroll = 0;
-            self.ensure_rendered(self.selected_project);
-        }
-    }
-
     pub fn scroll_down(&mut self, amount: u16) {
         self.scroll = self.scroll.saturating_add(amount);
     }

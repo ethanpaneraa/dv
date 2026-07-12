@@ -293,10 +293,7 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
             hints.push(Span::styled(project.name.clone(), Style::default().fg(DIM)));
             hints.push(Span::styled("  \u{2022}  ", Style::default().fg(DIM)));
         }
-        hints.extend(key_hint_spans(&[
-            ("{ }", "switch"),
-            ("space space", "all projects"),
-        ]));
+        hints.extend(key_hint_spans(&[("space space", "all projects")]));
         hints.push(Span::styled("  \u{2022}  ", Style::default().fg(DIM)));
     }
     hints.extend(key_hint_spans(&[("n/p", "file")]));
