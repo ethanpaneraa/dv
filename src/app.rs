@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line as RLine, Span};
+use ratatui::widgets::ListState;
 
 use crate::diffmodel::{self, FileDiff, LineKind};
 use crate::highlight::Highlighter;
@@ -38,6 +39,11 @@ pub struct App {
     // Lazily built on first use -- loading syntect's default syntax/theme sets isn't
     // free, and Home never needs it at all.
     highlighter: Option<Highlighter>,
+    // Persisted across frames so ratatui can scroll these lists incrementally as the
+    // selection moves, instead of recomputing the viewport from scratch every draw
+    // (which made items above the selection appear to vanish rather than scroll).
+    pub files_list_state: ListState,
+    pub project_list_state: ListState,
 }
 
 impl App {
@@ -92,6 +98,8 @@ impl App {
             matches: Vec::new(),
             matched_selected: 0,
             highlighter: None,
+            files_list_state: ListState::default(),
+            project_list_state: ListState::default(),
         }
     }
 

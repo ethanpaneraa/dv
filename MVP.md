@@ -109,6 +109,21 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
   previously meant "previous file" — that's now `p`/Shift-Tab only, freeing `Left` for
   the drill-out semantics. `Right`/`Tab`/`n` are unchanged (still "next file") since
   there's nothing further right to drill into once you're already in the Diff view.
+- **Fixed: files scrolling out of view looked broken** — the Files sidebar and
+  Projects list rebuilt a fresh `ListState::default()` on every single frame, so
+  ratatui had no memory of where the viewport was scrolled to. The moment the
+  selection crossed the visible window, it recomputed the scroll from a blank slate
+  and jumped straight to placing the selection at the bottom edge — looking like every
+  file above had vanished, rather than scrolling incrementally. Fixed by persisting
+  `ListState` in `App` (`files_list_state`, `project_list_state`) across frames.
+  Verified in a 14-row terminal with 19 changed files: stepping through now scrolls
+  one line at a time in both directions, reaching both ends of the list correctly.
+- **Fixed: no way to discover file-navigation keys** — the Diff screen's footer showed
+  project-switching hints (`{ }`, `space space`) but never mentioned `n`/`p`, the
+  actual keys that move between files in the sidebar. `{`/`}` are for switching
+  *projects* — with only one project loaded they're correctly no-ops, which read as
+  "these keys don't do anything" rather than "there's nothing to switch to." Footer
+  now always shows `n/p: file`.
 
 ## Roadmap (next, in priority order)
 

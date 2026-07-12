@@ -36,14 +36,16 @@ repo. See [MVP.md](MVP.md) for product scope.
   It's a no-op if the diff didn't actually change (`FileDiff` etc. derive `PartialEq`
   for this) and never removes a project whose changes got committed away — see the
   watch-mode note below for why.
-- `src/ui.rs` — `draw()` dispatches on `app.screen`. `draw_home()` is a full-page
-  dashboard: logo, a stat line, a Projects list (filter input + per-project `+N -M`,
-  accent-colored border) beside a live Preview pane (selected project's files with
-  their own `+N -M`), and a footer with accent-colored key hints. `draw_diff_screen()`
-  renders Files (dim border) + Diff (accent border — see below) plus a footer hint bar.
-  One `ACCENT` color constant ties selection highlight, the Diff pane's border, the
-  Projects list border, and footer key labels together — don't introduce new ad hoc
-  colors for these roles, reuse `ACCENT`/`DIM`/`ADDED_FG`/`REMOVED_FG`.
+- `src/ui.rs` — `draw()` takes `&mut App` (not `&App`) and dispatches on `app.screen`:
+  the Files and Projects lists need mutable access to their persisted `ListState` (see
+  the `ListState` note below). `draw_home()` is a full-page dashboard: logo, a stat
+  line, a Projects list (filter input + per-project `+N -M`, accent-colored border)
+  beside a live Preview pane (selected project's files with their own `+N -M`), and a
+  footer with accent-colored key hints. `draw_diff_screen()` renders Files (dim
+  border) + Diff (accent border — see below) plus a footer hint bar. One `ACCENT`
+  color constant ties selection highlight, the Diff pane's border, the Projects list
+  border, and footer key labels together — don't introduce new ad hoc colors for these
+  roles, reuse `ACCENT`/`DIM`/`ADDED_FG`/`REMOVED_FG`.
 
 This went through two rejected iterations before landing on the current design — don't
 reintroduce either:
@@ -84,6 +86,16 @@ Binary is named `dv`, not `diff` — a global install named `diff` would shadow 
 `diff` command on `PATH`. Toolchain is pinned via `rust-toolchain.toml` (1.97.0) — this
 project needed 1.85+ for transitive deps (`edition2024`), so a bare `cargo build` on an
 older system-wide toolchain would otherwise fail exactly like it did at project start.
+
+**Any `ratatui` `List`/`Table` the user scrolls through needs a `ListState` persisted
+in `App`, not a fresh `ListState::default()` built inside the render function.** We
+shipped the Files sidebar and Projects list with a fresh one every frame; it looked
+broken — the moment the selection scrolled past the visible window, ratatui recomputed
+the viewport from a blank slate instead of nudging it by one line, so everything above
+the selection appeared to vanish in one jump instead of scrolling. Fixed by adding
+`files_list_state`/`project_list_state: ListState` fields to `App` and reusing them
+across frames (`ui::draw` takes `&mut App` for exactly this reason now). If you add
+another scrollable list, give it the same treatment up front.
 
 ## Before considering any change done
 

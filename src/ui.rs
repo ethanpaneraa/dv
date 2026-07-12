@@ -1,7 +1,7 @@
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line as RLine, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
+use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
 use ratatui::Frame;
 
 use crate::app::{App, ProjectView, Screen};
@@ -23,14 +23,14 @@ const ADDED_FG: Color = Color::Green;
 const REMOVED_FG: Color = Color::Red;
 const DIM: Color = Color::DarkGray;
 
-pub fn draw(frame: &mut Frame, app: &App) {
+pub fn draw(frame: &mut Frame, app: &mut App) {
     match app.screen {
         Screen::Home => draw_home(frame, app),
         Screen::Diff => draw_diff_screen(frame, app),
     }
 }
 
-fn draw_home(frame: &mut Frame, app: &App) {
+fn draw_home(frame: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -96,7 +96,7 @@ fn draw_stat_line(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), area);
 }
 
-fn draw_project_list(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
     let outer = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(ACCENT))
@@ -130,9 +130,10 @@ fn draw_project_list(frame: &mut Frame, app: &App, area: Rect) {
         })
         .collect();
 
-    let mut state = ListState::default();
-    if !app.matches.is_empty() {
-        state.select(Some(app.matched_selected));
+    if app.matches.is_empty() {
+        app.project_list_state.select(None);
+    } else {
+        app.project_list_state.select(Some(app.matched_selected));
     }
 
     let list = List::new(items)
@@ -143,7 +144,7 @@ fn draw_project_list(frame: &mut Frame, app: &App, area: Rect) {
         )
         .highlight_symbol("> ");
 
-    frame.render_stateful_widget(list, inner_chunks[1], &mut state);
+    frame.render_stateful_widget(list, inner_chunks[1], &mut app.project_list_state);
 }
 
 fn draw_preview(frame: &mut Frame, app: &App, area: Rect) {
@@ -204,7 +205,7 @@ fn draw_home_footer(frame: &mut Frame, area: Rect) {
     frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), area);
 }
 
-fn draw_diff_screen(frame: &mut Frame, app: &App) {
+fn draw_diff_screen(frame: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(1), Constraint::Length(1)])
@@ -220,7 +221,7 @@ fn draw_diff_screen(frame: &mut Frame, app: &App) {
     draw_footer(frame, app, chunks[1]);
 }
 
-fn draw_files_sidebar(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_files_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(DIM))
@@ -242,8 +243,7 @@ fn draw_files_sidebar(frame: &mut Frame, app: &App, area: Rect) {
         })
         .unwrap_or_default();
 
-    let mut state = ListState::default();
-    state.select(Some(app.selected_file));
+    app.files_list_state.select(Some(app.selected_file));
 
     let list = List::new(items)
         .highlight_style(
@@ -253,7 +253,7 @@ fn draw_files_sidebar(frame: &mut Frame, app: &App, area: Rect) {
         )
         .highlight_symbol("> ");
 
-    frame.render_stateful_widget(list, inner, &mut state);
+    frame.render_stateful_widget(list, inner, &mut app.files_list_state);
 }
 
 fn draw_diff_pane(frame: &mut Frame, app: &App, area: Rect) {
@@ -299,6 +299,8 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
         ]));
         hints.push(Span::styled("  \u{2022}  ", Style::default().fg(DIM)));
     }
+    hints.extend(key_hint_spans(&[("n/p", "file")]));
+    hints.push(Span::styled("  \u{2022}  ", Style::default().fg(DIM)));
     hints.extend(key_hint_spans(&[("\u{2190}", "home"), ("q", "quit")]));
 
     frame.render_widget(Paragraph::new(RLine::from(hints)), area);
