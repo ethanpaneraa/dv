@@ -154,13 +154,23 @@ fn event_loop(
                                 _ => {}
                             },
                             Screen::Diff => {
-                                if key.code == KeyCode::Char(' ') {
+                                if app.switcher_open {
+                                    match key.code {
+                                        KeyCode::Esc => app.close_switcher(),
+                                        KeyCode::Enter => app.switcher_confirm(),
+                                        KeyCode::Backspace => app.switcher_backspace(),
+                                        KeyCode::Up => app.switcher_move(-1),
+                                        KeyCode::Down => app.switcher_move(1),
+                                        KeyCode::Char(c) => app.switcher_type(c),
+                                        _ => {}
+                                    }
+                                } else if key.code == KeyCode::Char(' ') {
                                     let now = Instant::now();
                                     let is_double_tap = last_space.is_some_and(|prev| {
                                         now.duration_since(prev) <= DOUBLE_TAP_WINDOW
                                     });
                                     if is_double_tap {
-                                        app.go_home();
+                                        app.open_switcher();
                                         last_space = None;
                                     } else {
                                         last_space = Some(now);

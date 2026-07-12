@@ -1,10 +1,10 @@
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line as RLine, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
 use ratatui::Frame;
 
-use crate::app::{App, ProjectView, Screen};
+use crate::app::{App, ProjectView, Screen, SwitchEntry};
 use crate::diffmodel;
 
 const LOGO: &str = "\
@@ -126,7 +126,14 @@ fn draw_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
         .iter()
         .map(|&idx| {
             let p = &app.projects[idx];
-            ListItem::new(stat_row(&p.name, p.added, p.removed, width, 2))
+            ListItem::new(stat_row(
+                &p.name,
+                Style::default(),
+                p.added,
+                p.removed,
+                width,
+                2,
+            ))
         })
         .collect();
 
@@ -172,7 +179,14 @@ fn draw_preview(frame: &mut Frame, app: &App, area: Rect) {
         .iter()
         .map(|f| {
             let (added, removed) = diffmodel::file_stats(f);
-            ListItem::new(stat_row(&f.path, added, removed, width, 0))
+            ListItem::new(stat_row(
+                &f.path,
+                Style::default(),
+                added,
+                removed,
+                width,
+                0,
+            ))
         })
         .collect();
 
@@ -183,6 +197,7 @@ fn draw_preview(frame: &mut Frame, app: &App, area: Rect) {
 /// `reserve` accounts for a highlight_symbol prefix on lists that use one.
 fn stat_row(
     name: &str,
+    name_style: Style,
     added: usize,
     removed: usize,
     width: u16,
@@ -193,7 +208,7 @@ fn stat_row(
     let pad = " ".repeat((width as usize).saturating_sub(used).max(1));
 
     RLine::from(vec![
-        Span::raw(name.to_string()),
+        Span::styled(name.to_string(), name_style),
         Span::raw(pad),
         Span::styled(format!("+{added} "), Style::default().fg(ADDED_FG)),
         Span::styled(format!("-{removed}"), Style::default().fg(REMOVED_FG)),
@@ -219,6 +234,98 @@ fn draw_diff_screen(frame: &mut Frame, app: &mut App) {
     draw_files_sidebar(frame, app, content[0]);
     draw_diff_pane(frame, app, content[1]);
     draw_footer(frame, app, chunks[1]);
+
+    if app.switcher_open {
+        draw_switcher(frame, app);
+    }
+}
+
+/// Telescope-style overlay: fuzzy list mixing the current project's files with every
+/// other loaded project, so you can jump to either without leaving the Diff screen.
+fn draw_switcher(frame: &mut Frame, app: &mut App) {
+    let area = centered_rect(60, 60, frame.area());
+    frame.render_widget(Clear, area);
+
+    let outer = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT))
+        .title("Switch to a file or project");
+    let inner = outer.inner(area);
+    frame.render_widget(outer, area);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .split(inner);
+
+    let input = Paragraph::new(format!("> {}", app.switcher_query)).style(
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
+    );
+    frame.render_widget(input, chunks[0]);
+
+    let width = chunks[1].width;
+    let current_project = app.current_project();
+    let items: Vec<ListItem> = app
+        .switcher_matches
+        .iter()
+        .map(|&entry| match entry {
+            SwitchEntry::File(idx) => {
+                let file = current_project.and_then(|p| p.files.get(idx));
+                let name = file.map(|f| f.path.as_str()).unwrap_or("?");
+                let (added, removed) = file.map(diffmodel::file_stats).unwrap_or((0, 0));
+                ListItem::new(stat_row(name, Style::default(), added, removed, width, 2))
+            }
+            SwitchEntry::Project(idx) => {
+                let p = &app.projects[idx];
+                ListItem::new(stat_row(
+                    &p.name,
+                    Style::default().fg(ACCENT),
+                    p.added,
+                    p.removed,
+                    width,
+                    2,
+                ))
+            }
+        })
+        .collect();
+
+    if app.switcher_matches.is_empty() {
+        app.switcher_list_state.select(None);
+    } else {
+        app.switcher_list_state.select(Some(app.switcher_selected));
+    }
+
+    let list = List::new(items)
+        .highlight_style(
+            Style::default()
+                .bg(SELECTED_BG)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("> ");
+
+    frame.render_stateful_widget(list, chunks[1], &mut app.switcher_list_state);
+}
+
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let vertical = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(vertical[1])[1]
 }
 
 fn draw_files_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -237,7 +344,14 @@ fn draw_files_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
                 .iter()
                 .map(|f| {
                     let (added, removed) = diffmodel::file_stats(f);
-                    ListItem::new(stat_row(&f.path, added, removed, width, 2))
+                    ListItem::new(stat_row(
+                        &f.path,
+                        Style::default(),
+                        added,
+                        removed,
+                        width,
+                        2,
+                    ))
                 })
                 .collect()
         })
@@ -296,7 +410,7 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
     }
     hints.extend(key_hint_spans(&[("n/p", "file")]));
     hints.push(Span::styled("  \u{2022}  ", Style::default().fg(DIM)));
-    hints.extend(key_hint_spans(&[("space space", "home"), ("q", "quit")]));
+    hints.extend(key_hint_spans(&[("space space", "switch"), ("q", "quit")]));
 
     frame.render_widget(Paragraph::new(RLine::from(hints)), area);
 }

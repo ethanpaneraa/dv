@@ -133,9 +133,19 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
   pressing `}` silently swapped the *entire* Files list to a different project with no
   visual cue that a switch had happened, which read as "my files just vanished" rather
   than "I switched context." Two confusing incidents from the same feature was enough
-  to conclude it wasn't earning its complexity. The only way to switch projects now is
-  double-tap `Space` → Home screen → pick one explicitly — deliberate, and it shows you
-  exactly what you're picking before you commit to it.
+  to conclude it wasn't earning its complexity. Double-tap `Space` became the only way
+  to switch projects — at first by jumping all the way to the full Home dashboard.
+- **`Space space` now opens a Telescope-style switcher instead of jumping to Home** —
+  going all the way back to the full-page dashboard every time you wanted a different
+  file or project was more disruptive than necessary; you'd lose your place in the
+  Diff screen entirely. Double-tap `Space` now opens a small floating overlay (the one
+  modal pattern still left in the app, deliberately, for this in-context case) listing
+  the current project's files *and* every other loaded project in one fuzzy-filterable
+  list — type to narrow, arrows to move, Enter to jump, Esc to cancel without changing
+  anything. Project entries are colored accent-blue to distinguish them from file
+  entries. The full Home dashboard is still what you see on startup; there's just no
+  in-session way back to it now (`go_home()` was removed as dead code) — quit and
+  relaunch if you want that fuller stats/preview view again.
 
 ## Roadmap (next, in priority order)
 

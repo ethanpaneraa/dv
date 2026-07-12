@@ -26,6 +26,14 @@ pub enum Screen {
     Diff,
 }
 
+/// One entry in the Telescope-style switcher: either a file in the current project,
+/// or a different project entirely.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum SwitchEntry {
+    File(usize),
+    Project(usize),
+}
+
 pub struct App {
     pub projects: Vec<ProjectView>,
     pub selected_project: usize,
@@ -44,6 +52,11 @@ pub struct App {
     // (which made items above the selection appear to vanish rather than scroll).
     pub files_list_state: ListState,
     pub project_list_state: ListState,
+    pub switcher_open: bool,
+    pub switcher_query: String,
+    pub switcher_matches: Vec<SwitchEntry>,
+    pub switcher_selected: usize,
+    pub switcher_list_state: ListState,
 }
 
 impl App {
@@ -100,6 +113,11 @@ impl App {
             highlighter: None,
             files_list_state: ListState::default(),
             project_list_state: ListState::default(),
+            switcher_open: false,
+            switcher_query: String::new(),
+            switcher_matches: Vec::new(),
+            switcher_selected: 0,
+            switcher_list_state: ListState::default(),
         }
     }
 
@@ -167,13 +185,84 @@ impl App {
         self.should_quit = true;
     }
 
-    /// Returns to the full-page project picker, e.g. from a double-tap of Space while
-    /// reviewing a diff.
-    pub fn go_home(&mut self) {
-        self.screen = Screen::Home;
-        self.query.clear();
-        self.matched_selected = 0;
-        self.recompute_matches();
+    /// Opens the in-context switcher (double-tap Space from the Diff view): a
+    /// Telescope-style fuzzy list mixing the current project's files with every other
+    /// loaded project, so you can jump to either without leaving the Diff screen.
+    pub fn open_switcher(&mut self) {
+        self.switcher_open = true;
+        self.switcher_query.clear();
+        self.switcher_selected = 0;
+        self.recompute_switcher_matches();
+    }
+
+    pub fn close_switcher(&mut self) {
+        self.switcher_open = false;
+    }
+
+    pub fn switcher_type(&mut self, c: char) {
+        self.switcher_query.push(c);
+        self.switcher_selected = 0;
+        self.recompute_switcher_matches();
+    }
+
+    pub fn switcher_backspace(&mut self) {
+        self.switcher_query.pop();
+        self.switcher_selected = 0;
+        self.recompute_switcher_matches();
+    }
+
+    pub fn switcher_move(&mut self, delta: i32) {
+        if self.switcher_matches.is_empty() {
+            return;
+        }
+        let len = self.switcher_matches.len() as i32;
+        let idx = (self.switcher_selected as i32 + delta).clamp(0, len - 1);
+        self.switcher_selected = idx as usize;
+    }
+
+    pub fn switcher_confirm(&mut self) {
+        if let Some(&entry) = self.switcher_matches.get(self.switcher_selected) {
+            match entry {
+                SwitchEntry::File(file_idx) => {
+                    self.selected_file = file_idx;
+                    self.scroll = 0;
+                }
+                SwitchEntry::Project(project_idx) => {
+                    self.selected_project = project_idx;
+                    self.selected_file = 0;
+                    self.scroll = 0;
+                    self.ensure_rendered(project_idx);
+                }
+            }
+        }
+        self.close_switcher();
+    }
+
+    fn recompute_switcher_matches(&mut self) {
+        let query = self.switcher_query.to_lowercase();
+        let mut matches = Vec::new();
+
+        if let Some(project) = self.current_project() {
+            for (i, f) in project.files.iter().enumerate() {
+                if query.is_empty() || f.path.to_lowercase().contains(&query) {
+                    matches.push(SwitchEntry::File(i));
+                }
+            }
+        }
+
+        for (i, p) in self.projects.iter().enumerate() {
+            if i == self.selected_project {
+                continue;
+            }
+            if query.is_empty() || p.name.to_lowercase().contains(&query) {
+                matches.push(SwitchEntry::Project(i));
+            }
+        }
+
+        self.switcher_matches = matches;
+        if self.switcher_selected >= self.switcher_matches.len() {
+            self.switcher_selected = 0;
+        }
     }
 
     pub fn home_type(&mut self, c: char) {
