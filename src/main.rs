@@ -15,6 +15,7 @@ use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 use std::io::stdout;
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 use app::App;
 
@@ -89,10 +90,14 @@ fn run_tui(app: &mut App) -> Result<()> {
     result
 }
 
+const DOUBLE_TAP_WINDOW: Duration = Duration::from_millis(350);
+
 fn event_loop(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     app: &mut App,
 ) -> Result<()> {
+    let mut last_space: Option<Instant> = None;
+
     loop {
         terminal.draw(|frame| ui::draw(frame, app))?;
 
@@ -100,18 +105,42 @@ fn event_loop(
             if key.kind != KeyEventKind::Press {
                 continue;
             }
-            match key.code {
-                KeyCode::Char('q') | KeyCode::Esc => app.quit(),
-                KeyCode::Char('j') | KeyCode::Down => app.scroll_down(1),
-                KeyCode::Char('k') | KeyCode::Up => app.scroll_up(1),
-                KeyCode::Char('d') => app.scroll_down(15),
-                KeyCode::Char('u') => app.scroll_up(15),
-                KeyCode::Char('n') | KeyCode::Tab | KeyCode::Right => app.next_file(),
-                KeyCode::Char('p') | KeyCode::BackTab | KeyCode::Left => app.prev_file(),
-                KeyCode::Char('}') => app.next_project(),
-                KeyCode::Char('{') => app.prev_project(),
-                KeyCode::Char('g') => app.scroll = 0,
-                _ => {}
+
+            if app.palette_open {
+                match key.code {
+                    KeyCode::Esc => app.close_palette(),
+                    KeyCode::Enter => app.palette_confirm(),
+                    KeyCode::Backspace => app.palette_backspace(),
+                    KeyCode::Up => app.palette_move(-1),
+                    KeyCode::Down => app.palette_move(1),
+                    KeyCode::Char(c) => app.palette_type(c),
+                    _ => {}
+                }
+            } else if key.code == KeyCode::Char(' ') {
+                let now = Instant::now();
+                let is_double_tap =
+                    last_space.is_some_and(|prev| now.duration_since(prev) <= DOUBLE_TAP_WINDOW);
+                if is_double_tap {
+                    app.open_palette();
+                    last_space = None;
+                } else {
+                    last_space = Some(now);
+                }
+            } else {
+                last_space = None;
+                match key.code {
+                    KeyCode::Char('q') | KeyCode::Esc => app.quit(),
+                    KeyCode::Char('j') | KeyCode::Down => app.scroll_down(1),
+                    KeyCode::Char('k') | KeyCode::Up => app.scroll_up(1),
+                    KeyCode::Char('d') => app.scroll_down(15),
+                    KeyCode::Char('u') => app.scroll_up(15),
+                    KeyCode::Char('n') | KeyCode::Tab | KeyCode::Right => app.next_file(),
+                    KeyCode::Char('p') | KeyCode::BackTab | KeyCode::Left => app.prev_file(),
+                    KeyCode::Char('}') => app.next_project(),
+                    KeyCode::Char('{') => app.prev_project(),
+                    KeyCode::Char('g') => app.scroll = 0,
+                    _ => {}
+                }
             }
         }
 

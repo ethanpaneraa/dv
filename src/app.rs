@@ -20,6 +20,10 @@ pub struct App {
     pub selected_file: usize,
     pub scroll: u16,
     pub should_quit: bool,
+    pub palette_open: bool,
+    pub palette_query: String,
+    pub palette_matches: Vec<usize>,
+    pub palette_selected: usize,
 }
 
 impl App {
@@ -47,6 +51,10 @@ impl App {
             selected_file: 0,
             scroll: 0,
             should_quit: false,
+            palette_open: false,
+            palette_query: String::new(),
+            palette_matches: Vec::new(),
+            palette_selected: 0,
         }
     }
 
@@ -96,6 +104,58 @@ impl App {
             self.selected_file = 0;
             self.scroll = 0;
         }
+    }
+
+    pub fn open_palette(&mut self) {
+        self.palette_open = true;
+        self.palette_query.clear();
+        self.palette_selected = 0;
+        self.recompute_palette_matches();
+    }
+
+    pub fn close_palette(&mut self) {
+        self.palette_open = false;
+    }
+
+    pub fn palette_type(&mut self, c: char) {
+        self.palette_query.push(c);
+        self.palette_selected = 0;
+        self.recompute_palette_matches();
+    }
+
+    pub fn palette_backspace(&mut self) {
+        self.palette_query.pop();
+        self.palette_selected = 0;
+        self.recompute_palette_matches();
+    }
+
+    pub fn palette_move(&mut self, delta: i32) {
+        if self.palette_matches.is_empty() {
+            return;
+        }
+        let len = self.palette_matches.len() as i32;
+        let idx = (self.palette_selected as i32 + delta).clamp(0, len - 1);
+        self.palette_selected = idx as usize;
+    }
+
+    pub fn palette_confirm(&mut self) {
+        if let Some(&project_idx) = self.palette_matches.get(self.palette_selected) {
+            self.selected_project = project_idx;
+            self.selected_file = 0;
+            self.scroll = 0;
+        }
+        self.close_palette();
+    }
+
+    fn recompute_palette_matches(&mut self) {
+        let query = self.palette_query.to_lowercase();
+        self.palette_matches = self
+            .projects
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| query.is_empty() || p.name.to_lowercase().contains(&query))
+            .map(|(i, _)| i)
+            .collect();
     }
 
     pub fn scroll_down(&mut self, amount: u16) {

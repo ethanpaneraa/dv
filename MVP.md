@@ -36,12 +36,20 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
 
 - **Multi-project view** — `dv --scan <dir>` discovers immediate git-repo subdirectories
   of `<dir>`, computes a diff for each, and only surfaces projects that currently have
-  changes. A Projects pane appears alongside the existing Files pane whenever more than
-  one project is loaded (`{`/`}` to switch); single-repo invocation (`dv` with no args,
-  or one explicit path) is visually unchanged — still just Files + Diff. This is the
-  flagship differentiator identified against `hunk` and typical terminal diff tools
-  (`delta`, `difftastic`), none of which track more than one repo at a time — confirmed
-  by checking `hunk`'s README, feature table, and issue tracker directly.
+  changes. This is the flagship differentiator identified against `hunk` and typical
+  terminal diff tools (`delta`, `difftastic`), none of which track more than one repo at
+  a time — confirmed by checking `hunk`'s README, feature table, and issue tracker
+  directly.
+- **Command palette for project switching** — the first cut of multi-project view used
+  a permanent Projects sidebar column; that ate width from the diff pane (the thing that
+  actually matters) and split navigation across two different key models. Replaced with
+  an app-like pattern instead: single-repo layout (Files + Diff) stays the default view
+  regardless of project count, and double-tapping Space (within ~350ms) pops a centered,
+  fuzzy-filterable switcher — type to narrow, arrows to move, Enter to jump, Esc to
+  cancel. `{`/`}` still cycle projects directly for fast switching without opening the
+  palette. A footer hint bar shows the current project name (when >1 loaded) and the
+  `space space` / `q` hints; it disappears in single-repo mode where there's nothing to
+  switch to.
 
 ## Roadmap (next, in priority order)
 
@@ -53,7 +61,7 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
 3. **Side-by-side / split view** — real readability upgrade for larger changes, deferred
    from MVP because of the added layout complexity (column widths, terminal-width
    breakpoints).
-4. **Polish** — visible keybinding hint bar, `rust-toolchain.toml` pin.
+4. **Polish** — `rust-toolchain.toml` pin.
 
 ## Explicitly deferred (not on the near-term roadmap)
 

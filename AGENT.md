@@ -14,10 +14,16 @@ repo. See [MVP.md](MVP.md) for product scope.
   no changes).
 - `src/highlight.rs` — `syntect` wrapper, converts syntax styles into `ratatui` spans.
 - `src/app.rs` — app state (`App` holding `Vec<ProjectView>`), pre-renders each file's
-  diff into styled `ratatui::text::Line`s at load time.
-- `src/ui.rs` — layout and widget rendering for one frame: Projects + Files + Diff panes
-  when multiple projects are loaded, Files + Diff only when there's just one (unchanged
-  single-repo UX).
+  diff into styled `ratatui::text::Line`s at load time. Also owns command-palette state
+  (`palette_open`/`palette_query`/`palette_matches`/`palette_selected`) and its
+  open/type/backspace/move/confirm methods.
+- `src/ui.rs` — layout and widget rendering for one frame: Files + Diff panes plus a
+  footer hint bar, always — project count never changes the base layout. When
+  `palette_open`, a centered floating overlay (project switcher) is drawn on top.
+
+There is deliberately no permanent Projects sidebar column. An earlier version had one;
+it ate width from the diff pane and split navigation across two key models. Don't
+reintroduce a persistent multi-column project list — extend the palette instead.
 
 Binary is named `dv`, not `diff` — a global install named `diff` would shadow the Unix
 `diff` command on `PATH`.
