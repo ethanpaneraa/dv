@@ -81,18 +81,37 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
   scrolling the diff) — `n`/`p`/arrows and `j`/`k` were never actually ambiguous, so a
   toggle would add a mode without fixing a real conflict. If that changes (e.g. Files
   needs its own independent up/down navigation), revisit as a genuine `Focus` enum.
+- **Watch mode** — the actual reason this tool exists: reviewing agents while they
+  work, without quitting and relaunching every time a file changes. A background
+  thread (`src/watch.rs`) re-diffs every loaded project root every 2s and sends
+  changes over an `mpsc` channel (no new dependency — `std::thread` + polling, not a
+  filesystem-events crate). The event loop switched from a blocking `event::read()` to
+  `event::poll(200ms)` so it wakes up on its own to drain the channel even with no
+  keypresses. Verified live: edited a tracked file from outside the running session,
+  watched the diff pane update within ~2s with no input. Two deliberate constraints to
+  keep it from being disorienting mid-review: a project whose changes get committed
+  away keeps showing its last-known content instead of vanishing from the list, and
+  the watcher only re-diffs the roots discovered at startup — it doesn't add newly
+  appearing repos or remove ones that disappear.
+- **Parser robustness** — added real unit tests for `diffmodel::parse` (previously a
+  documented gap), built from *real* `git diff` output captured against scratch repos
+  rather than hand-written fixtures: new files, deletions (path correctly taken from
+  the `a/` side since `b/` is `/dev/null`), pure renames (zero hunks, similarity
+  index 100%), renames with content changes, "no newline at end of file" markers,
+  and true binary file diffs (`Binary files ... differ`, no hunks, no crash). All 9
+  passed on the first real run — no bugs found, but the behavior is now locked in
+  against regressions.
+- **`rust-toolchain.toml` pinned** to 1.97.0, so a future clone doesn't hit the same
+  `edition2024`/Cargo-1.83 wall we hit at project start.
 
 ## Roadmap (next, in priority order)
 
-1. **Watch mode** — auto-reload as files/git state change, built on top of the
-   multi-project loader above (re-poll each loaded project root, not just cwd).
-2. **Parser robustness** — no test coverage yet for `diffmodel::parse` against renames,
-   deletions, new binary files, or "no newline at end of file." Agents produce all of
-   these; a wrong render is worse than a missing feature.
-3. **Side-by-side / split view** — real readability upgrade for larger changes, deferred
+1. **Side-by-side / split view** — real readability upgrade for larger changes, deferred
    from MVP because of the added layout complexity (column widths, terminal-width
    breakpoints).
-4. **Polish** — `rust-toolchain.toml` pin.
+2. **Watch mode refinements** — rediscover new repos appearing under the scan root
+   without a restart; surface a "committed" indicator on projects the watcher notices
+   went to zero changes, instead of silently freezing their last content.
 
 ## Explicitly deferred (not on the near-term roadmap)
 

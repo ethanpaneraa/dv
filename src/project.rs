@@ -6,6 +6,7 @@ use crate::git;
 
 pub struct Project {
     pub name: String,
+    pub root: PathBuf,
     pub files: Vec<FileDiff>,
 }
 
@@ -42,5 +43,9 @@ pub fn load(root: &Path, staged: bool) -> Result<Option<Project>> {
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| root.display().to_string());
 
-    Ok(Some(Project { name, files }))
+    Ok(Some(Project {
+        name,
+        root: root.to_path_buf(),
+        files,
+    }))
 }

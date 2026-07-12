@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line as RLine, Span};
 
@@ -10,6 +12,7 @@ const REMOVED_BG: Color = Color::Rgb(45, 20, 22);
 
 pub struct ProjectView {
     pub name: String,
+    pub root: PathBuf,
     pub files: Vec<FileDiff>,
     pub added: usize,
     pub removed: usize,
@@ -69,6 +72,7 @@ impl App {
                     .fold((0, 0), |(a, r), (fa, fr)| (a + fa, r + fr));
                 ProjectView {
                     name: p.name,
+                    root: p.root,
                     files: p.files,
                     added,
                     removed,
@@ -216,6 +220,44 @@ impl App {
             self.scroll = 0;
             self.screen = Screen::Diff;
             self.ensure_rendered(project_idx);
+        }
+    }
+
+    /// Merges a fresh diff for `root` from the watch thread into the matching
+    /// project. Two things this deliberately does *not* do, to keep watch mode from
+    /// being disorienting mid-review: it never removes a project whose changes were
+    /// committed away (leaves the last known content in place), and it never adds
+    /// projects that weren't in the original discovery set.
+    pub fn apply_watch_update(&mut self, root: &Path, updated: Option<Project>) {
+        let Some(idx) = self.projects.iter().position(|p| p.root == root) else {
+            return;
+        };
+        let Some(new_project) = updated else {
+            return;
+        };
+        if self.projects[idx].files == new_project.files {
+            return;
+        }
+
+        let (added, removed) = new_project
+            .files
+            .iter()
+            .map(diffmodel::file_stats)
+            .fold((0, 0), |(a, r), (fa, fr)| (a + fa, r + fr));
+
+        self.projects[idx].files = new_project.files;
+        self.projects[idx].added = added;
+        self.projects[idx].removed = removed;
+        self.projects[idx].rendered = None;
+
+        if idx == self.selected_project {
+            let file_count = self.projects[idx].files.len();
+            if self.selected_file >= file_count {
+                self.selected_file = file_count.saturating_sub(1);
+            }
+            if self.screen == Screen::Diff {
+                self.ensure_rendered(idx);
+            }
         }
     }
 

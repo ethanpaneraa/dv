@@ -18,6 +18,10 @@ repo. See [MVP.md](MVP.md) for product scope.
   `std::thread::scope` — each call is an independent `git diff` subprocess spawn, and
   running them sequentially was measured to dominate startup time on multi-repo scans.
 - `src/highlight.rs` — `syntect` wrapper, converts syntax styles into `ratatui` spans.
+- `src/watch.rs` — `spawn(roots, staged)` starts a detached `std::thread` that re-diffs
+  every root every 2s and sends `Update { root, project }` over an `mpsc::Receiver`.
+  Errors from a single tick's `project::load` (e.g. git transiently locked) are
+  swallowed for that root and retried next interval, not surfaced or retried faster.
 - `src/app.rs` — app state (`App` holding `Vec<ProjectView>` plus a `Screen` enum:
   `Home` or `Diff`). Rendering (syntax highlighting) is **lazy**: `ProjectView.rendered`
   is `Option<Vec<Vec<Line>>>`, populated by `ensure_rendered()` the first time a project
@@ -25,7 +29,13 @@ repo. See [MVP.md](MVP.md) for product scope.
   Home never needs it. `App.highlighter: Option<Highlighter>` is lazy for the same
   reason: constructing it loads `syntect`'s default syntax/theme sets, which isn't free.
   Home-screen nav state (`query`/`matches`/`matched_selected`) and its type/backspace/
-  move/confirm methods; `go_home()` returns to it from `Diff`.
+  move/confirm methods; `go_home()` returns to it from `Diff`. `apply_watch_update()`
+  merges a fresh diff from `watch.rs` into the matching `ProjectView` (matched by
+  `root: PathBuf`, brought back specifically for this after being removed earlier as
+  unused — re-add data fields when a real need shows up, don't keep them "for later").
+  It's a no-op if the diff didn't actually change (`FileDiff` etc. derive `PartialEq`
+  for this) and never removes a project whose changes got committed away — see the
+  watch-mode note below for why.
 - `src/ui.rs` — `draw()` dispatches on `app.screen`. `draw_home()` is a full-page
   dashboard: logo, a stat line, a Projects list (filter input + per-project `+N -M`,
   accent-colored border) beside a live Preview pane (selected project's files with
@@ -59,8 +69,21 @@ fixing a real conflict. Don't add one speculatively; if a genuine conflict shows
 (e.g. Files needs independent arrow-key navigation), that's when a real `Focus` enum
 earns its complexity.
 
+**Watch mode is polling, not filesystem events, on purpose.** `notify` (or similar)
+would react instantly instead of within a 2s window, but `std::thread` + a plain
+re-diff loop needed zero new dependencies and was simple enough to get right the first
+time. If the interval ever feels too slow, that's the point to evaluate `notify` — don't
+add it speculatively. Two behavior constraints exist specifically to keep a live-updating
+list from being disorienting mid-review, and both are intentional, not oversights:
+watch updates never remove a project from the list (a project whose changes got
+committed away keeps showing its last content), and the watcher never discovers new
+repos that appear under the scan root after startup — it only re-diffs the roots found
+at launch.
+
 Binary is named `dv`, not `diff` — a global install named `diff` would shadow the Unix
-`diff` command on `PATH`.
+`diff` command on `PATH`. Toolchain is pinned via `rust-toolchain.toml` (1.97.0) — this
+project needed 1.85+ for transitive deps (`edition2024`), so a bare `cargo build` on an
+older system-wide toolchain would otherwise fail exactly like it did at project start.
 
 ## Before considering any change done
 
@@ -103,10 +126,11 @@ keep it that way rather than letting formatting drift and fixing it in a big bat
   separate top-level `tests/` tree, unless a test needs to run the built binary
   end-to-end.
 - `diffmodel::parse` is the highest-value thing to unit test — it's pure and has no
-  I/O. Add a test case whenever you touch its parsing logic (new file markers, no
-  trailing newline, renames, binary files, etc.).
-- There's no test coverage yet for `diffmodel::parse` — that's a gap, not a decision;
-  add it before extending the parser further.
+  I/O. It now has coverage for new/deleted/renamed/binary files and "no newline at end
+  of file," built from real `git diff` output captured against scratch repos rather
+  than hand-written — extend the same way (generate real fixtures, don't guess git's
+  format) when you touch parsing logic further, e.g. for a future rename-metadata
+  display or Jujutsu/Sapling support with a different diff format.
 - For anything touching the TUI itself (`app.rs`, `ui.rs`, `main.rs` event loop), there's
   no automated test harness. Verify manually by running the built binary inside a real
   or `tmux`-allocated pty against a scratch git repo — `ratatui`/`crossterm` need a real
