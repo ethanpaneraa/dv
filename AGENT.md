@@ -5,7 +5,10 @@ repo. See [MVP.md](MVP.md) for product scope.
 
 ## Project layout
 
-- `src/main.rs` — CLI entry point, terminal setup/teardown, event loop.
+- `src/main.rs` — entry point, terminal setup/teardown, event loop. Two paths: an
+  explicit `dv <path>` argument skips discovery and Home entirely (for scripting/pager
+  use); no path means auto-discovery (cwd + its immediate git-repo children with
+  changes) followed by `Screen::Home`.
 - `src/git.rs` — shells out to `git diff` / `git diff --staged` in a given directory
   (`diff_in`), plus `is_repo` for repo detection.
 - `src/diffmodel.rs` — parses unified diff text into `FileDiff` → `Hunk` → `Line`.
@@ -13,17 +16,28 @@ repo. See [MVP.md](MVP.md) for product scope.
   a scan dir) and loading (`load`: runs the diff for one root, `None` if not a repo or
   no changes).
 - `src/highlight.rs` — `syntect` wrapper, converts syntax styles into `ratatui` spans.
-- `src/app.rs` — app state (`App` holding `Vec<ProjectView>`), pre-renders each file's
-  diff into styled `ratatui::text::Line`s at load time. Also owns command-palette state
-  (`palette_open`/`palette_query`/`palette_matches`/`palette_selected`) and its
-  open/type/backspace/move/confirm methods.
-- `src/ui.rs` — layout and widget rendering for one frame: Files + Diff panes plus a
-  footer hint bar, always — project count never changes the base layout. When
-  `palette_open`, a centered floating overlay (project switcher) is drawn on top.
+- `src/app.rs` — app state (`App` holding `Vec<ProjectView>` plus a `Screen` enum:
+  `Home` or `Diff`). Pre-renders each file's diff into styled `ratatui::text::Line`s at
+  load time. Home-screen nav state (`query`/`matches`/`matched_selected`) and its
+  type/backspace/move/confirm methods; `go_home()` returns to it from `Diff`.
+- `src/ui.rs` — `draw()` dispatches on `app.screen`: `draw_home()` is a full-page
+  dashboard (ASCII logo, filter input, project list, footer) with no floating widgets;
+  `draw_diff_screen()` renders Files + Diff panes plus a footer hint bar.
 
-There is deliberately no permanent Projects sidebar column. An earlier version had one;
-it ate width from the diff pane and split navigation across two key models. Don't
-reintroduce a persistent multi-column project list — extend the palette instead.
+This went through two rejected iterations before landing on the current design — don't
+reintroduce either:
+1. A permanent Projects sidebar column: ate width from the diff pane, split navigation
+   across two key models ({}/} vs n/p).
+2. A floating command-palette overlay (`Clear` + centered `Rect` on top of the diff):
+   fixed the width problem but was still a modal bolted onto content, not an actual app
+   screen — the user explicitly wants this "more like a TUI, less like a CLI," closer to
+   nvim's dashboard than to a fuzzy-finder popup.
+
+The current model: `Screen::Home` is a real full-page screen (like nvim's dashboard,
+shown even when there's only one project, for consistency), and `Screen::Diff` is the
+Files+Diff view. Switching between them is a screen replacement, not an overlay. Extend
+`Screen` with new variants for new full-page views rather than drawing more floating
+boxes.
 
 Binary is named `dv`, not `diff` — a global install named `diff` would shadow the Unix
 `diff` command on `PATH`.

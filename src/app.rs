@@ -14,20 +14,44 @@ pub struct ProjectView {
     pub rendered: Vec<Vec<RLine<'static>>>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Screen {
+    Home,
+    Diff,
+}
+
 pub struct App {
     pub projects: Vec<ProjectView>,
     pub selected_project: usize,
     pub selected_file: usize,
     pub scroll: u16,
     pub should_quit: bool,
-    pub palette_open: bool,
-    pub palette_query: String,
-    pub palette_matches: Vec<usize>,
-    pub palette_selected: usize,
+    pub screen: Screen,
+    pub query: String,
+    pub matches: Vec<usize>,
+    pub matched_selected: usize,
 }
 
 impl App {
+    /// Lands on the Home screen so the caller picks a project. Used for the default
+    /// (no explicit path) discovery flow, even when only one or zero projects load --
+    /// consistent app-like behavior beats skipping straight in when there's exactly one.
     pub fn new(projects: Vec<Project>) -> Self {
+        let mut app = Self::from_projects(projects);
+        app.recompute_matches();
+        app
+    }
+
+    /// Skips Home entirely. Used when a single project was named explicitly on the
+    /// command line (scripting / git-pager use), where an interactive picker would
+    /// just be in the way.
+    pub fn new_direct(project: Project) -> Self {
+        let mut app = Self::from_projects(vec![project]);
+        app.screen = Screen::Diff;
+        app
+    }
+
+    fn from_projects(projects: Vec<Project>) -> Self {
         let highlighter = Highlighter::new();
         let projects = projects
             .into_iter()
@@ -45,26 +69,17 @@ impl App {
             })
             .collect();
 
-        let mut app = Self {
+        Self {
             projects,
             selected_project: 0,
             selected_file: 0,
             scroll: 0,
             should_quit: false,
-            palette_open: false,
-            palette_query: String::new(),
-            palette_matches: Vec::new(),
-            palette_selected: 0,
-        };
-
-        // With more than one project, land on a launcher (the same picker used for
-        // switching later) instead of dropping straight into whichever project sorted
-        // first alphabetically.
-        if app.projects.len() > 1 {
-            app.open_palette();
+            screen: Screen::Home,
+            query: String::new(),
+            matches: Vec::new(),
+            matched_selected: 0,
         }
-
-        app
     }
 
     pub fn current_project(&self) -> Option<&ProjectView> {
@@ -115,58 +130,6 @@ impl App {
         }
     }
 
-    pub fn open_palette(&mut self) {
-        self.palette_open = true;
-        self.palette_query.clear();
-        self.palette_selected = 0;
-        self.recompute_palette_matches();
-    }
-
-    pub fn close_palette(&mut self) {
-        self.palette_open = false;
-    }
-
-    pub fn palette_type(&mut self, c: char) {
-        self.palette_query.push(c);
-        self.palette_selected = 0;
-        self.recompute_palette_matches();
-    }
-
-    pub fn palette_backspace(&mut self) {
-        self.palette_query.pop();
-        self.palette_selected = 0;
-        self.recompute_palette_matches();
-    }
-
-    pub fn palette_move(&mut self, delta: i32) {
-        if self.palette_matches.is_empty() {
-            return;
-        }
-        let len = self.palette_matches.len() as i32;
-        let idx = (self.palette_selected as i32 + delta).clamp(0, len - 1);
-        self.palette_selected = idx as usize;
-    }
-
-    pub fn palette_confirm(&mut self) {
-        if let Some(&project_idx) = self.palette_matches.get(self.palette_selected) {
-            self.selected_project = project_idx;
-            self.selected_file = 0;
-            self.scroll = 0;
-        }
-        self.close_palette();
-    }
-
-    fn recompute_palette_matches(&mut self) {
-        let query = self.palette_query.to_lowercase();
-        self.palette_matches = self
-            .projects
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| query.is_empty() || p.name.to_lowercase().contains(&query))
-            .map(|(i, _)| i)
-            .collect();
-    }
-
     pub fn scroll_down(&mut self, amount: u16) {
         self.scroll = self.scroll.saturating_add(amount);
     }
@@ -177,6 +140,62 @@ impl App {
 
     pub fn quit(&mut self) {
         self.should_quit = true;
+    }
+
+    /// Returns to the full-page project picker, e.g. from a double-tap of Space while
+    /// reviewing a diff.
+    pub fn go_home(&mut self) {
+        self.screen = Screen::Home;
+        self.query.clear();
+        self.matched_selected = 0;
+        self.recompute_matches();
+    }
+
+    pub fn home_type(&mut self, c: char) {
+        self.query.push(c);
+        self.matched_selected = 0;
+        self.recompute_matches();
+    }
+
+    pub fn home_backspace(&mut self) {
+        self.query.pop();
+        self.matched_selected = 0;
+        self.recompute_matches();
+    }
+
+    pub fn home_clear_query(&mut self) {
+        self.query.clear();
+        self.matched_selected = 0;
+        self.recompute_matches();
+    }
+
+    pub fn home_move(&mut self, delta: i32) {
+        if self.matches.is_empty() {
+            return;
+        }
+        let len = self.matches.len() as i32;
+        let idx = (self.matched_selected as i32 + delta).clamp(0, len - 1);
+        self.matched_selected = idx as usize;
+    }
+
+    pub fn home_confirm(&mut self) {
+        if let Some(&project_idx) = self.matches.get(self.matched_selected) {
+            self.selected_project = project_idx;
+            self.selected_file = 0;
+            self.scroll = 0;
+            self.screen = Screen::Diff;
+        }
+    }
+
+    fn recompute_matches(&mut self) {
+        let query = self.query.to_lowercase();
+        self.matches = self
+            .projects
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| query.is_empty() || p.name.to_lowercase().contains(&query))
+            .map(|(i, _)| i)
+            .collect();
     }
 }
 

@@ -19,7 +19,8 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
 
 ## What's in the MVP
 
-- `dv` — shows `git diff` (working tree) in a TUI.
+- `dv` — shows `git diff` (working tree) in a TUI. (Superseded by discovery + Home
+  screen below — kept here as the original scope this built on.)
 - `dv --staged` — shows `git diff --staged`.
 - File sidebar + unified diff pane.
 - Syntax highlighting per file, based on extension.
@@ -34,27 +35,24 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
 
 ## Shipped since MVP
 
-- **Multi-project view** — `dv --scan <dir>` discovers immediate git-repo subdirectories
-  of `<dir>`, computes a diff for each, and only surfaces projects that currently have
-  changes. This is the flagship differentiator identified against `hunk` and typical
-  terminal diff tools (`delta`, `difftastic`), none of which track more than one repo at
-  a time — confirmed by checking `hunk`'s README, feature table, and issue tracker
-  directly.
-- **Command palette for project switching** — the first cut of multi-project view used
-  a permanent Projects sidebar column; that ate width from the diff pane (the thing that
-  actually matters) and split navigation across two different key models. Replaced with
-  an app-like pattern instead: single-repo layout (Files + Diff) stays the default view
-  regardless of project count, and double-tapping Space (within ~350ms) pops a centered,
-  fuzzy-filterable switcher — type to narrow, arrows to move, Enter to jump, Esc to
-  cancel. `{`/`}` still cycle projects directly for fast switching without opening the
-  palette. A footer hint bar shows the current project name (when >1 loaded) and the
-  `space space` / `q` hints; it disappears in single-repo mode where there's nothing to
-  switch to.
-- **Launcher screen on startup** — nvim-style: when more than one project loads, `dv`
-  opens straight into the project picker (the same palette used for switching later)
-  instead of dropping onto whichever project happened to sort first alphabetically.
-  Single-repo invocation skips it entirely and opens directly into that project's Files
-  + Diff, same as always.
+- **Multi-project discovery** — `dv`, with no flags, discovers what there is to review:
+  the current directory (if it's itself a git repo) plus its immediate git-repo
+  subdirectories, diffing each and keeping only the ones with actual changes. This is
+  the flagship differentiator identified against `hunk` and typical terminal diff tools
+  (`delta`, `difftastic`), none of which track more than one repo at a time — confirmed
+  by checking `hunk`'s README, feature table, and issue tracker directly. `--scan <dir>`
+  overrides which directory gets discovered (defaults to cwd); an explicit `dv <path>`
+  bypasses discovery entirely for scripting/pager use.
+- **Home screen, not a CLI flag** — this went through two iterations. First, a permanent
+  Projects sidebar column: rejected, it ate width from the diff pane and split navigation
+  across two key models. Second, a floating command-palette overlay (double-tap Space):
+  better, but still modal-on-top-of-content rather than an actual app. Landed on an
+  nvim-dashboard-style **full-page Home screen** instead: `dv` always opens here first
+  (an ASCII logo, a fuzzy-filterable project list, a footer) regardless of how many
+  projects were found — including exactly one, for consistency — and Enter opens the
+  selected project into Files + Diff. Double-tapping Space from within a project returns
+  to Home (full-page, not an overlay); `{`/`}` still cycle projects directly without
+  leaving the diff. Only `dv <path>` (an explicit path) skips Home, for scripting.
 
 ## Roadmap (next, in priority order)
 
