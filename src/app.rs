@@ -45,7 +45,7 @@ impl App {
             })
             .collect();
 
-        Self {
+        let mut app = Self {
             projects,
             selected_project: 0,
             selected_file: 0,
@@ -55,7 +55,16 @@ impl App {
             palette_query: String::new(),
             palette_matches: Vec::new(),
             palette_selected: 0,
+        };
+
+        // With more than one project, land on a launcher (the same picker used for
+        // switching later) instead of dropping straight into whichever project sorted
+        // first alphabetically.
+        if app.projects.len() > 1 {
+            app.open_palette();
         }
+
+        app
     }
 
     pub fn current_project(&self) -> Option<&ProjectView> {

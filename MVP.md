@@ -50,6 +50,11 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
   palette. A footer hint bar shows the current project name (when >1 loaded) and the
   `space space` / `q` hints; it disappears in single-repo mode where there's nothing to
   switch to.
+- **Launcher screen on startup** — nvim-style: when more than one project loads, `dv`
+  opens straight into the project picker (the same palette used for switching later)
+  instead of dropping onto whichever project happened to sort first alphabetically.
+  Single-repo invocation skips it entirely and opens directly into that project's Files
+  + Diff, same as always.
 
 ## Roadmap (next, in priority order)
 
