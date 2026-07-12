@@ -32,10 +32,31 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
 - Panic hook that restores the terminal (raw mode off, alternate screen closed) before
   printing the panic, so a crash doesn't leave the terminal broken.
 
-## Explicitly deferred (not MVP)
+## Shipped since MVP
 
-- Side-by-side / split view
-- Watch mode (auto-reload on file/git changes)
+- **Multi-project view** — `dv --scan <dir>` discovers immediate git-repo subdirectories
+  of `<dir>`, computes a diff for each, and only surfaces projects that currently have
+  changes. A Projects pane appears alongside the existing Files pane whenever more than
+  one project is loaded (`{`/`}` to switch); single-repo invocation (`dv` with no args,
+  or one explicit path) is visually unchanged — still just Files + Diff. This is the
+  flagship differentiator identified against `hunk` and typical terminal diff tools
+  (`delta`, `difftastic`), none of which track more than one repo at a time — confirmed
+  by checking `hunk`'s README, feature table, and issue tracker directly.
+
+## Roadmap (next, in priority order)
+
+1. **Watch mode** — auto-reload as files/git state change, built on top of the
+   multi-project loader above (re-poll each loaded project root, not just cwd).
+2. **Parser robustness** — no test coverage yet for `diffmodel::parse` against renames,
+   deletions, new binary files, or "no newline at end of file." Agents produce all of
+   these; a wrong render is worse than a missing feature.
+3. **Side-by-side / split view** — real readability upgrade for larger changes, deferred
+   from MVP because of the added layout complexity (column widths, terminal-width
+   breakpoints).
+4. **Polish** — visible keybinding hint bar, `rust-toolchain.toml` pin.
+
+## Explicitly deferred (not on the near-term roadmap)
+
 - Jujutsu / Sapling VCS support
 - Raw patch input via stdin (`dv patch -`)
 - Agent annotation / live-collaboration system

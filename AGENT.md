@@ -6,12 +6,18 @@ repo. See [MVP.md](MVP.md) for product scope.
 ## Project layout
 
 - `src/main.rs` — CLI entry point, terminal setup/teardown, event loop.
-- `src/git.rs` — shells out to `git diff` / `git diff --staged`, returns raw text.
+- `src/git.rs` — shells out to `git diff` / `git diff --staged` in a given directory
+  (`diff_in`), plus `is_repo` for repo detection.
 - `src/diffmodel.rs` — parses unified diff text into `FileDiff` → `Hunk` → `Line`.
+- `src/project.rs` — project discovery (`discover`: immediate git-repo subdirectories of
+  a scan dir) and loading (`load`: runs the diff for one root, `None` if not a repo or
+  no changes).
 - `src/highlight.rs` — `syntect` wrapper, converts syntax styles into `ratatui` spans.
-- `src/app.rs` — app state (`App`), pre-renders each file's diff into styled
-  `ratatui::text::Line`s at load time.
-- `src/ui.rs` — layout and widget rendering (sidebar + diff pane) for one frame.
+- `src/app.rs` — app state (`App` holding `Vec<ProjectView>`), pre-renders each file's
+  diff into styled `ratatui::text::Line`s at load time.
+- `src/ui.rs` — layout and widget rendering for one frame: Projects + Files + Diff panes
+  when multiple projects are loaded, Files + Diff only when there's just one (unchanged
+  single-repo UX).
 
 Binary is named `dv`, not `diff` — a global install named `diff` would shadow the Unix
 `diff` command on `PATH`.
@@ -30,7 +36,7 @@ keep it that way rather than letting formatting drift and fixing it in a big bat
 
 ## Rust conventions for this codebase
 
-- **Errors**: `anyhow::Result` at the boundaries (`main`, `git::diff`). Don't introduce
+- **Errors**: `anyhow::Result` at the boundaries (`main`, `git::diff_in`). Don't introduce
   a custom error enum unless a caller actually needs to match on error variants.
 - **Panics**: no `unwrap`/`expect` on data derived from user input, file contents, or
   subprocess output — use `?` or explicit fallback (see `parse_hunk_header`'s

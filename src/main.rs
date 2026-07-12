@@ -2,9 +2,10 @@ mod app;
 mod diffmodel;
 mod git;
 mod highlight;
+mod project;
 mod ui;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -13,21 +14,51 @@ use crossterm::{execute, ExecutableCommand};
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 use std::io::stdout;
+use std::path::PathBuf;
 
 use app::App;
 
 fn main() -> Result<()> {
-    let staged = std::env::args().any(|a| a == "--staged");
+    let mut staged = false;
+    let mut scan_dirs: Vec<PathBuf> = Vec::new();
+    let mut explicit_dirs: Vec<PathBuf> = Vec::new();
 
-    let diff_text = git::diff(staged)?;
-    let files = diffmodel::parse(&diff_text);
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--staged" => staged = true,
+            "--scan" => {
+                let dir = args
+                    .next()
+                    .ok_or_else(|| anyhow!("--scan requires a directory argument"))?;
+                scan_dirs.push(PathBuf::from(dir));
+            }
+            other => explicit_dirs.push(PathBuf::from(other)),
+        }
+    }
 
-    if files.is_empty() {
+    let mut roots = Vec::new();
+    for scan_dir in &scan_dirs {
+        roots.extend(project::discover(scan_dir)?);
+    }
+    roots.extend(explicit_dirs);
+    if roots.is_empty() {
+        roots.push(std::env::current_dir()?);
+    }
+
+    let mut projects = Vec::new();
+    for root in &roots {
+        if let Some(p) = project::load(root, staged)? {
+            projects.push(p);
+        }
+    }
+
+    if projects.is_empty() {
         println!("No changes to show.");
         return Ok(());
     }
 
-    let mut app = App::new(files);
+    let mut app = App::new(projects);
     run_tui(&mut app)?;
     Ok(())
 }
@@ -77,6 +108,8 @@ fn event_loop(
                 KeyCode::Char('u') => app.scroll_up(15),
                 KeyCode::Char('n') | KeyCode::Tab | KeyCode::Right => app.next_file(),
                 KeyCode::Char('p') | KeyCode::BackTab | KeyCode::Left => app.prev_file(),
+                KeyCode::Char('}') => app.next_project(),
+                KeyCode::Char('{') => app.prev_project(),
                 KeyCode::Char('g') => app.scroll = 0,
                 _ => {}
             }
