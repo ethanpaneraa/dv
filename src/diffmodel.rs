@@ -25,6 +25,22 @@ pub struct FileDiff {
     pub hunks: Vec<Hunk>,
 }
 
+/// Counts added/removed lines across all of a file's hunks.
+pub fn file_stats(file: &FileDiff) -> (usize, usize) {
+    let mut added = 0;
+    let mut removed = 0;
+    for hunk in &file.hunks {
+        for line in &hunk.lines {
+            match line.kind {
+                LineKind::Added => added += 1,
+                LineKind::Removed => removed += 1,
+                LineKind::Context => {}
+            }
+        }
+    }
+    (added, removed)
+}
+
 /// Parses `git diff`-style unified diff text into a list of per-file hunks.
 pub fn parse(diff_text: &str) -> Vec<FileDiff> {
     let mut files = Vec::new();

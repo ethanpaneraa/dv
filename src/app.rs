@@ -1,7 +1,7 @@
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line as RLine, Span};
 
-use crate::diffmodel::{FileDiff, LineKind};
+use crate::diffmodel::{self, FileDiff, LineKind};
 use crate::highlight::Highlighter;
 use crate::project::Project;
 
@@ -11,6 +11,8 @@ const REMOVED_BG: Color = Color::Rgb(45, 20, 22);
 pub struct ProjectView {
     pub name: String,
     pub files: Vec<FileDiff>,
+    pub added: usize,
+    pub removed: usize,
     rendered: Option<Vec<Vec<RLine<'static>>>>,
 }
 
@@ -59,10 +61,19 @@ impl App {
     fn from_projects(projects: Vec<Project>) -> Self {
         let projects = projects
             .into_iter()
-            .map(|p| ProjectView {
-                name: p.name,
-                files: p.files,
-                rendered: None,
+            .map(|p| {
+                let (added, removed) = p
+                    .files
+                    .iter()
+                    .map(diffmodel::file_stats)
+                    .fold((0, 0), |(a, r), (fa, fr)| (a + fa, r + fr));
+                ProjectView {
+                    name: p.name,
+                    files: p.files,
+                    added,
+                    removed,
+                    rendered: None,
+                }
             })
             .collect();
 

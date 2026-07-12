@@ -26,9 +26,14 @@ repo. See [MVP.md](MVP.md) for product scope.
   reason: constructing it loads `syntect`'s default syntax/theme sets, which isn't free.
   Home-screen nav state (`query`/`matches`/`matched_selected`) and its type/backspace/
   move/confirm methods; `go_home()` returns to it from `Diff`.
-- `src/ui.rs` — `draw()` dispatches on `app.screen`: `draw_home()` is a full-page
-  dashboard (ASCII logo, filter input, project list, footer) with no floating widgets;
-  `draw_diff_screen()` renders Files + Diff panes plus a footer hint bar.
+- `src/ui.rs` — `draw()` dispatches on `app.screen`. `draw_home()` is a full-page
+  dashboard: logo, a stat line, a Projects list (filter input + per-project `+N -M`,
+  accent-colored border) beside a live Preview pane (selected project's files with
+  their own `+N -M`), and a footer with accent-colored key hints. `draw_diff_screen()`
+  renders Files (dim border) + Diff (accent border — see below) plus a footer hint bar.
+  One `ACCENT` color constant ties selection highlight, the Diff pane's border, the
+  Projects list border, and footer key labels together — don't introduce new ad hoc
+  colors for these roles, reuse `ACCENT`/`DIM`/`ADDED_FG`/`REMOVED_FG`.
 
 This went through two rejected iterations before landing on the current design — don't
 reintroduce either:
@@ -44,6 +49,15 @@ shown even when there's only one project, for consistency), and `Screen::Diff` i
 Files+Diff view. Switching between them is a screen replacement, not an overlay. Extend
 `Screen` with new variants for new full-page views rather than drawing more floating
 boxes.
+
+**Visual hierarchy, not a focus-toggle model.** The Diff pane's border is accent-colored
+and Files' is dim on purpose — Diff is always the primary, always-live content (`j`/`k`
+always scroll it, unconditionally), Files is a secondary nav rail (`n`/`p`/arrows always
+switch files, unconditionally). There's deliberately no `Focus` enum or Tab-to-switch —
+the two key sets were never actually ambiguous, so a toggle would add a mode without
+fixing a real conflict. Don't add one speculatively; if a genuine conflict shows up
+(e.g. Files needs independent arrow-key navigation), that's when a real `Focus` enum
+earns its complexity.
 
 Binary is named `dv`, not `diff` — a global install named `diff` would shadow the Unix
 `diff` command on `PATH`.

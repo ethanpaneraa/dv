@@ -66,6 +66,21 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
     5 repos meant 5 spawns back to back, ~480ms of the ~500ms total at that point.
     Now parallelized with `std::thread::scope` (no new dependency); wall time drops
     to roughly the single slowest repo's diff instead of the sum of all of them.
+- **Home became a real dashboard, not a bare list** — feedback was that it read as a
+  proof-of-concept (a single box with a filter and a flat list) rather than a designed
+  app. Added: a stat line under the logo ("3 projects with changes • 13 files • +13
+  -13"); a live **preview pane** next to the project list showing the highlighted
+  project's files, each with its own `+N -M`; per-project `+N -M` in the list itself
+  (via `diffmodel::file_stats`, a cheap line-count, no highlighting needed); and
+  accent-colored key hints in the footer (key in blue-bold, description in gray)
+  instead of flat gray text throughout.
+- **Visual hierarchy between panes** — the Diff pane's border is now accent blue
+  (`Color::Rgb(97, 175, 239)`) and the Files sidebar's is dim gray, since the Diff pane
+  is always the primary, always-scrollable content and Files is a secondary nav rail.
+  This is deliberately not a real focus-toggle (no mode where arrow keys stop
+  scrolling the diff) — `n`/`p`/arrows and `j`/`k` were never actually ambiguous, so a
+  toggle would add a mode without fixing a real conflict. If that changes (e.g. Files
+  needs its own independent up/down navigation), revisit as a genuine `Focus` enum.
 
 ## Roadmap (next, in priority order)
 
