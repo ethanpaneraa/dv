@@ -14,12 +14,18 @@ repo. See [MVP.md](MVP.md) for product scope.
 - `src/diffmodel.rs` — parses unified diff text into `FileDiff` → `Hunk` → `Line`.
 - `src/project.rs` — project discovery (`discover`: immediate git-repo subdirectories of
   a scan dir) and loading (`load`: runs the diff for one root, `None` if not a repo or
-  no changes).
+  no changes). `main.rs` calls `load` for each discovered root in parallel via
+  `std::thread::scope` — each call is an independent `git diff` subprocess spawn, and
+  running them sequentially was measured to dominate startup time on multi-repo scans.
 - `src/highlight.rs` — `syntect` wrapper, converts syntax styles into `ratatui` spans.
 - `src/app.rs` — app state (`App` holding `Vec<ProjectView>` plus a `Screen` enum:
-  `Home` or `Diff`). Pre-renders each file's diff into styled `ratatui::text::Line`s at
-  load time. Home-screen nav state (`query`/`matches`/`matched_selected`) and its
-  type/backspace/move/confirm methods; `go_home()` returns to it from `Diff`.
+  `Home` or `Diff`). Rendering (syntax highlighting) is **lazy**: `ProjectView.rendered`
+  is `Option<Vec<Vec<Line>>>`, populated by `ensure_rendered()` the first time a project
+  is actually opened (`home_confirm`/`next_project`/`prev_project`), not at load time —
+  Home never needs it. `App.highlighter: Option<Highlighter>` is lazy for the same
+  reason: constructing it loads `syntect`'s default syntax/theme sets, which isn't free.
+  Home-screen nav state (`query`/`matches`/`matched_selected`) and its type/backspace/
+  move/confirm methods; `go_home()` returns to it from `Diff`.
 - `src/ui.rs` — `draw()` dispatches on `app.screen`: `draw_home()` is a full-page
   dashboard (ASCII logo, filter input, project list, footer) with no floating widgets;
   `draw_diff_screen()` renders Files + Diff panes plus a footer hint bar.
@@ -62,10 +68,12 @@ keep it that way rather than letting formatting drift and fixing it in a big bat
   subprocess output — use `?` or explicit fallback (see `parse_hunk_header`'s
   `unwrap_or(1)` for the pattern: fall back to a sane default rather than crash on a
   malformed hunk header). `unwrap`/`expect` are fine in `#[cfg(test)]` code.
-- **Ownership in rendering**: `app.rs` builds `Vec<Line<'static>>` once per file at
-  load time rather than re-highlighting on every frame. Keep new rendering work in that
-  same "compute once, cache in `App`" shape — don't do per-keystroke recomputation of
-  anything that scales with diff size.
+- **Ownership in rendering**: `app.rs` builds `Vec<Line<'static>>` once per file, lazily
+  on first visit (`ensure_rendered`), and caches it rather than re-highlighting on every
+  frame. Keep new rendering work in that same "compute once on first need, cache in
+  `App`" shape — don't do per-keystroke recomputation of anything that scales with diff
+  size, and don't move work back to eager/upfront unless it's genuinely needed before
+  the first screen draws (Home doesn't need any file content).
 - **No new dependencies without checking prior art first.** This project deliberately
   follows the crate choices of `bat`/`delta`/`gitui` (`syntect`, `ratatui`,
   `crossterm`). If a task seems to need a new crate, check whether one of those

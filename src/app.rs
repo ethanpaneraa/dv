@@ -11,7 +11,7 @@ const REMOVED_BG: Color = Color::Rgb(45, 20, 22);
 pub struct ProjectView {
     pub name: String,
     pub files: Vec<FileDiff>,
-    pub rendered: Vec<Vec<RLine<'static>>>,
+    rendered: Option<Vec<Vec<RLine<'static>>>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -30,12 +30,16 @@ pub struct App {
     pub query: String,
     pub matches: Vec<usize>,
     pub matched_selected: usize,
+    // Lazily built on first use -- loading syntect's default syntax/theme sets isn't
+    // free, and Home never needs it at all.
+    highlighter: Option<Highlighter>,
 }
 
 impl App {
     /// Lands on the Home screen so the caller picks a project. Used for the default
     /// (no explicit path) discovery flow, even when only one or zero projects load --
     /// consistent app-like behavior beats skipping straight in when there's exactly one.
+    /// Nothing is syntax-highlighted here; Home only needs project names.
     pub fn new(projects: Vec<Project>) -> Self {
         let mut app = Self::from_projects(projects);
         app.recompute_matches();
@@ -48,24 +52,17 @@ impl App {
     pub fn new_direct(project: Project) -> Self {
         let mut app = Self::from_projects(vec![project]);
         app.screen = Screen::Diff;
+        app.ensure_rendered(0);
         app
     }
 
     fn from_projects(projects: Vec<Project>) -> Self {
-        let highlighter = Highlighter::new();
         let projects = projects
             .into_iter()
-            .map(|p| {
-                let rendered = p
-                    .files
-                    .iter()
-                    .map(|f| render_file(f, &highlighter))
-                    .collect();
-                ProjectView {
-                    name: p.name,
-                    files: p.files,
-                    rendered,
-                }
+            .map(|p| ProjectView {
+                name: p.name,
+                files: p.files,
+                rendered: None,
             })
             .collect();
 
@@ -79,7 +76,27 @@ impl App {
             query: String::new(),
             matches: Vec::new(),
             matched_selected: 0,
+            highlighter: None,
         }
+    }
+
+    /// Syntax-highlights a project's files on first visit and caches the result.
+    /// No-op if already rendered.
+    fn ensure_rendered(&mut self, idx: usize) {
+        let Some(project) = self.projects.get(idx) else {
+            return;
+        };
+        if project.rendered.is_some() {
+            return;
+        }
+
+        let highlighter = &*self.highlighter.get_or_insert_with(Highlighter::new);
+        let rendered = self.projects[idx]
+            .files
+            .iter()
+            .map(|f| render_file(f, highlighter))
+            .collect();
+        self.projects[idx].rendered = Some(rendered);
     }
 
     pub fn current_project(&self) -> Option<&ProjectView> {
@@ -92,7 +109,8 @@ impl App {
 
     pub fn current_rendered(&self) -> &[RLine<'static>] {
         self.current_project()
-            .and_then(|p| p.rendered.get(self.selected_file))
+            .and_then(|p| p.rendered.as_ref())
+            .and_then(|r| r.get(self.selected_file))
             .map(|v| v.as_slice())
             .unwrap_or(&[])
     }
@@ -119,6 +137,7 @@ impl App {
             self.selected_project += 1;
             self.selected_file = 0;
             self.scroll = 0;
+            self.ensure_rendered(self.selected_project);
         }
     }
 
@@ -127,6 +146,7 @@ impl App {
             self.selected_project -= 1;
             self.selected_file = 0;
             self.scroll = 0;
+            self.ensure_rendered(self.selected_project);
         }
     }
 
@@ -184,6 +204,7 @@ impl App {
             self.selected_file = 0;
             self.scroll = 0;
             self.screen = Screen::Diff;
+            self.ensure_rendered(project_idx);
         }
     }
 

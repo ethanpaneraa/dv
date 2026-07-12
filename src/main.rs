@@ -63,12 +63,23 @@ fn main() -> Result<()> {
     }
     roots.extend(project::discover(&discovery_root)?);
 
-    let mut projects = Vec::new();
-    for root in &roots {
-        if let Some(p) = project::load(root, staged)? {
-            projects.push(p);
+    // Each repo's `git diff` is an independent subprocess spawn; running them
+    // sequentially made a 5-repo scan take ~500ms. Loading in parallel collapses that
+    // to roughly the cost of the single slowest repo.
+    let projects: Vec<project::Project> = std::thread::scope(|scope| -> Result<_> {
+        let handles: Vec<_> = roots
+            .iter()
+            .map(|root| scope.spawn(|| project::load(root, staged)))
+            .collect();
+
+        let mut projects = Vec::new();
+        for handle in handles {
+            if let Some(p) = handle.join().expect("project load thread panicked")? {
+                projects.push(p);
+            }
         }
-    }
+        Ok(projects)
+    })?;
 
     let mut app = App::new(projects);
     run_tui(&mut app)?;

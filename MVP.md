@@ -53,6 +53,19 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
   selected project into Files + Diff. Double-tapping Space from within a project returns
   to Home (full-page, not an overlay); `{`/`}` still cycle projects directly without
   leaving the diff. Only `dv <path>` (an explicit path) skips Home, for scripting.
+- **Startup performance** — measured with a 5-repo, ~600-changed-line-per-repo stress
+  test (`time dv`, first draw to first keypress): 1.26s → 0.44s. Two fixes, found by
+  instrumenting `main`/`App::new` with real timers rather than guessing:
+  - Rendering (syntax highlighting via `syntect`) was eager — `App::new` highlighted
+    every file in every discovered project before Home even had a chance to draw,
+    even though Home never shows any of it. Now lazy: a project's files are only
+    highlighted the first time it's actually opened (`home_confirm`/`next_project`/
+    `prev_project`), cached after. The `Highlighter` itself (loading `syntect`'s
+    default syntax/theme sets) is now lazily constructed too, on that same first use.
+  - Loading each repo's diff (`git diff` subprocess spawn + parse) was sequential —
+    5 repos meant 5 spawns back to back, ~480ms of the ~500ms total at that point.
+    Now parallelized with `std::thread::scope` (no new dependency); wall time drops
+    to roughly the single slowest repo's diff instead of the sum of all of them.
 
 ## Roadmap (next, in priority order)
 

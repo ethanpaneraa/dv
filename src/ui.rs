@@ -26,7 +26,6 @@ fn draw_home(frame: &mut Frame, app: &App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(7),
-            Constraint::Length(3),
             Constraint::Min(3),
             Constraint::Length(1),
         ])
@@ -39,18 +38,27 @@ fn draw_home(frame: &mut Frame, app: &App) {
     );
     frame.render_widget(logo, chunks[0]);
 
-    let input = Paragraph::new(format!("> {}", app.query)).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title("Find a project"),
+    let outer = Block::default().borders(Borders::ALL).title("Projects");
+    let inner = outer.inner(chunks[1]);
+    frame.render_widget(outer, chunks[1]);
+
+    let inner_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(1)])
+        .split(inner);
+
+    let input = Paragraph::new(format!("> {}", app.query)).style(
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
     );
-    frame.render_widget(input, chunks[1]);
+    frame.render_widget(input, inner_chunks[0]);
 
     if app.projects.is_empty() {
         let empty = Paragraph::new("No projects with changes found here.")
             .alignment(Alignment::Center)
             .style(Style::default().fg(Color::DarkGray));
-        frame.render_widget(empty, chunks[2]);
+        frame.render_widget(empty, inner_chunks[1]);
     } else {
         let items: Vec<ListItem> = app
             .matches
@@ -64,7 +72,6 @@ fn draw_home(frame: &mut Frame, app: &App) {
         }
 
         let list = List::new(items)
-            .block(Block::default().borders(Borders::ALL).title("Projects"))
             .highlight_style(
                 Style::default()
                     .bg(Color::Rgb(40, 40, 60))
@@ -72,13 +79,13 @@ fn draw_home(frame: &mut Frame, app: &App) {
             )
             .highlight_symbol("> ");
 
-        frame.render_stateful_widget(list, chunks[2], &mut state);
+        frame.render_stateful_widget(list, inner_chunks[1], &mut state);
     }
 
     let footer = Paragraph::new("enter: open  \u{2022}  q: quit")
         .alignment(Alignment::Center)
         .style(Style::default().fg(Color::DarkGray));
-    frame.render_widget(footer, chunks[3]);
+    frame.render_widget(footer, chunks[2]);
 }
 
 fn draw_diff_screen(frame: &mut Frame, app: &App) {
