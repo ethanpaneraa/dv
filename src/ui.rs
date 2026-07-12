@@ -200,7 +200,7 @@ fn stat_row(
 }
 
 fn draw_home_footer(frame: &mut Frame, area: Rect) {
-    let line = key_hint_line(&[("enter", "open"), ("q", "quit")]);
+    let line = key_hint_line(&[("enter/\u{2192}", "open"), ("q", "quit")]);
     frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), area);
 }
 
@@ -299,7 +299,7 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
         ]));
         hints.push(Span::styled("  \u{2022}  ", Style::default().fg(DIM)));
     }
-    hints.extend(key_hint_spans(&[("q", "quit")]));
+    hints.extend(key_hint_spans(&[("\u{2190}", "home"), ("q", "quit")]));
 
     frame.render_widget(Paragraph::new(RLine::from(hints)), area);
 }

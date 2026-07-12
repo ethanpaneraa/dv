@@ -145,7 +145,7 @@ fn event_loop(
                         match app.screen {
                             Screen::Home => match key.code {
                                 KeyCode::Char('q') if app.query.is_empty() => app.quit(),
-                                KeyCode::Enter => app.home_confirm(),
+                                KeyCode::Enter | KeyCode::Right => app.home_confirm(),
                                 KeyCode::Backspace => app.home_backspace(),
                                 KeyCode::Up => app.home_move(-1),
                                 KeyCode::Down => app.home_move(1),
@@ -176,9 +176,8 @@ fn event_loop(
                                         KeyCode::Char('n') | KeyCode::Tab | KeyCode::Right => {
                                             app.next_file()
                                         }
-                                        KeyCode::Char('p') | KeyCode::BackTab | KeyCode::Left => {
-                                            app.prev_file()
-                                        }
+                                        KeyCode::Char('p') | KeyCode::BackTab => app.prev_file(),
+                                        KeyCode::Left => app.go_home(),
                                         KeyCode::Char('}') => app.next_project(),
                                         KeyCode::Char('{') => app.prev_project(),
                                         KeyCode::Char('g') => app.scroll = 0,

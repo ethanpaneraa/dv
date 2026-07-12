@@ -103,6 +103,12 @@ A terminal diff viewer for reviewing changes made by coding agents, in the spiri
   against regressions.
 - **`rust-toolchain.toml` pinned** to 1.97.0, so a future clone doesn't hit the same
   `edition2024`/Cargo-1.83 wall we hit at project start.
+- **Arrow-key drill-in/out on Home** — `Right`/`Enter` on a highlighted project opens
+  it into the Diff view (file-manager style: a project "contains" its diff); `Left`
+  from the Diff view returns to Home. This took over `Left` in the Diff view, which
+  previously meant "previous file" — that's now `p`/Shift-Tab only, freeing `Left` for
+  the drill-out semantics. `Right`/`Tab`/`n` are unchanged (still "next file") since
+  there's nothing further right to drill into once you're already in the Diff view.
 
 ## Roadmap (next, in priority order)
 
