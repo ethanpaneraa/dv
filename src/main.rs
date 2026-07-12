@@ -43,8 +43,16 @@ fn main() -> Result<()> {
         roots.extend(project::discover(scan_dir)?);
     }
     roots.extend(explicit_dirs);
-    if roots.is_empty() {
-        roots.push(std::env::current_dir()?);
+
+    let defaulted_to_cwd = roots.is_empty();
+    if defaulted_to_cwd {
+        let cwd = std::env::current_dir()?;
+        if !git::is_repo(&cwd) {
+            println!("'{}' is not a git repository.", cwd.display());
+            println!("If it contains multiple projects, try: dv --scan .");
+            return Ok(());
+        }
+        roots.push(cwd);
     }
 
     let mut projects = Vec::new();
